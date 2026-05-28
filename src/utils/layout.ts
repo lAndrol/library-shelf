@@ -9,8 +9,13 @@ export interface RectMm {
   h: number;
 }
 
+function groundedTopMm(book: Book, cubby: CubbyDimensions): number {
+  return Math.max(0, cubby.heightMm - book.heightMm);
+}
+
 export function bookFootprint(book: Book): RectMm {
-  return { x: book.posX, y: book.posY, w: book.widthMm, h: book.heightMm };
+  // Books always sit on the cubby floor; no vertical position input.
+  return { x: book.posX, y: 0, w: book.widthMm, h: book.heightMm };
 }
 
 export function rectsOverlap(a: RectMm, b: RectMm): boolean {
@@ -35,9 +40,8 @@ export function bookFitsCubby(book: Book, shelf: ShelfConfig): boolean {
 export function bookFitsCubbyDims(book: Book, cubby: CubbyDimensions): boolean {
   return (
     book.posX >= 0 &&
-    book.posY >= 0 &&
     book.posX + book.widthMm <= cubby.widthMm &&
-    book.posY + book.heightMm <= cubby.heightMm &&
+    book.heightMm <= cubby.heightMm &&
     book.posZ >= 0 &&
     book.posZ + book.depthMm <= cubby.depthMm
   );
@@ -46,9 +50,11 @@ export function bookFitsCubbyDims(book: Book, cubby: CubbyDimensions): boolean {
 /** Global target on the XY plane behind the shelf (mm), book center. */
 export function bookTargetMm(book: Book, shelf: ShelfConfig): { x: number; y: number } {
   const origin = cubbyOriginMm(shelf, book.cubbyX, book.cubbyY);
+  const cubby = getCubbyDimensions(shelf, book.cubbyX, book.cubbyY);
+  const top = groundedTopMm(book, cubby);
   return {
     x: origin.x + book.posX + book.widthMm / 2,
-    y: origin.y + book.posY + book.heightMm / 2,
+    y: origin.y + top + book.heightMm / 2,
   };
 }
 
@@ -63,9 +69,10 @@ export function bookStylePercent(
   height: string;
   zIndex: number;
 } {
+  const top = groundedTopMm(book, cubby);
   return {
     left: `${(book.posX / cubby.widthMm) * 100}%`,
-    top: `${(book.posY / cubby.heightMm) * 100}%`,
+    top: `${(top / cubby.heightMm) * 100}%`,
     width: `${(book.widthMm / cubby.widthMm) * 100}%`,
     height: `${(book.heightMm / cubby.heightMm) * 100}%`,
     zIndex: 10 + Math.round(book.posZ),
@@ -73,7 +80,8 @@ export function bookStylePercent(
 }
 
 export function formatPosition(book: Book): string {
-  return `cubby (${book.cubbyX},${book.cubbyY}) · ${book.posX}, ${book.posY}, ${book.posZ} mm`;
+  if (!book.placed) return "not on shelf";
+  return `cubby (${book.cubbyX},${book.cubbyY}) · x:${book.posX}, z:${book.posZ} mm`;
 }
 
 export function formatSize(book: Book): string {

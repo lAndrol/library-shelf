@@ -27,7 +27,6 @@ export function BookForm({
   const [cubbyX, setCubbyX] = useState(initial?.cubbyX ?? 0);
   const [cubbyY, setCubbyY] = useState(initial?.cubbyY ?? 0);
   const [posX, setPosX] = useState(initial?.posX ?? 0);
-  const [posY, setPosY] = useState(initial?.posY ?? 0);
   const [posZ, setPosZ] = useState(initial?.posZ ?? 0);
   const [widthMm, setWidthMm] = useState(
     initial?.widthMm ?? DEFAULT_BOOK_SIZE.widthMm,
@@ -58,7 +57,7 @@ export function BookForm({
         cubbyX,
         cubbyY,
         posX,
-        posY,
+        posY: 0,
         posZ,
         widthMm,
         heightMm,
@@ -119,9 +118,10 @@ export function BookForm({
       <fieldset className="form-fieldset">
         <legend>Position inside cubby (mm)</legend>
         <p className="coord-hint">
-          Fine coords from top-left. This cubby: {formatCubbyDimensions(cubbyDims)}
+          Books are grounded to the cubby floor. Set horizontal X and depth Z only.
+          Cubby: {formatCubbyDimensions(cubbyDims)}
         </p>
-        <div className="coord-row coord-row-3">
+        <div className="coord-row">
           <label>
             posX
             <input
@@ -130,16 +130,6 @@ export function BookForm({
               step={1}
               value={posX}
               onChange={(e) => setPosX(Number(e.target.value))}
-            />
-          </label>
-          <label>
-            posY
-            <input
-              type="number"
-              min={0}
-              step={1}
-              value={posY}
-              onChange={(e) => setPosY(Number(e.target.value))}
             />
           </label>
           <label>

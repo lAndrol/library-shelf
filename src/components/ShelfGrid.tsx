@@ -9,6 +9,7 @@ interface ShelfGridProps {
   cellTypes: Record<string, CellType>;
   selectedCubby: { x: number; y: number } | null;
   selectedBookId: string | null;
+  highlightedBookIds: Set<string>;
   onSelectCubby: (x: number, y: number) => void;
   onSelectBook: (book: Book) => void;
 }
@@ -19,6 +20,7 @@ export function ShelfGrid({
   cellTypes,
   selectedCubby,
   selectedBookId,
+  highlightedBookIds,
   onSelectCubby,
   onSelectBook,
 }: ShelfGridProps) {
@@ -54,6 +56,7 @@ export function ShelfGrid({
             cellType={type}
             isCubbySelected={isCubbySelected}
             selectedBookId={selectedBookId}
+            highlightedBookIds={highlightedBookIds}
             onSelectCubby={() => onSelectCubby(x, y)}
             onSelectBook={onSelectBook}
           />

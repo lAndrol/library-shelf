@@ -11,6 +11,7 @@ export interface Book extends BookDimensions {
   author: string;
   isbn: string;
   notes: string;
+  placed: boolean;
   /** Cubby column 0–4 (coarse grid). */
   cubbyX: number;
   /** Cubby row 0–4 (coarse grid). */
@@ -38,6 +39,11 @@ export type BookInput = Pick<
   | "widthMm"
   | "heightMm"
   | "depthMm"
+>;
+
+export type InventoryBookInput = Pick<
+  Book,
+  "title" | "author" | "isbn" | "notes" | "widthMm" | "heightMm" | "depthMm"
 >;
 
 export const DEFAULT_BOOK_SIZE = {

@@ -12,8 +12,6 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ shelf, onSaveDefault }: SettingsPanelProps) {
-  const overrideCount = Object.keys(shelf.cubbyOverrides).length;
-
   return (
     <section className="panel settings-panel">
       <h2>Shelf settings</h2>
@@ -36,12 +34,6 @@ export function SettingsPanel({ shelf, onSaveDefault }: SettingsPanelProps) {
         }}
         onSave={onSaveDefault}
       />
-
-      {overrideCount > 0 && (
-        <p className="muted">
-          {overrideCount} cubby(ies) have a custom size — select them on the shelf to edit.
-        </p>
-      )}
     </section>
   );
 }

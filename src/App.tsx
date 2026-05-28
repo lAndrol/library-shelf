@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import { ActionLog } from "./components/ActionLog";
 import { BookDetail } from "./components/BookDetail";
@@ -8,22 +8,23 @@ import { CubbyPanel } from "./components/CubbyPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { ShelfGrid } from "./components/ShelfGrid";
 import {
+  createInventoryBook,
   createBook,
   deleteBook,
   getBookById,
   getBooksInCubby,
+  listPlacedBooks,
   listBooks,
-  searchBooks,
+  listUnplacedBooks,
+  placeUnplacedBooksInCubby,
   suggestPosition,
   updateBook,
 } from "./services/books";
 import { presentBook, type PresentResult } from "./services/hardware";
 import {
-  clearCubbyDimensionsOverride,
   cycleCellType,
   getCellType,
   getShelfConfig,
-  setCubbyDimensions,
   setDefaultCubbyDimensions,
 } from "./services/shelf";
 import type { CubbyDimensions } from "./types/shelf";
@@ -44,17 +45,94 @@ function App() {
   } | null>(null);
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
   const [panelMode, setPanelMode] = useState<PanelMode>("detail");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [typeQuery, setTypeQuery] = useState("");
+  const [showTypeQuery, setShowTypeQuery] = useState(false);
   const [log, setLog] = useState<PresentResult[]>([]);
   const [presenting, setPresenting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const hideQueryTimerRef = useRef<number | null>(null);
 
   const shelf = useMemo(() => getShelfConfig(), [tick]);
   const books = useMemo(() => listBooks(), [tick]);
-  const filteredBooks = useMemo(
-    () => searchBooks(searchQuery),
-    [tick, searchQuery],
-  );
+  const placedBooks = useMemo(() => listPlacedBooks(), [tick]);
+  const unplacedBooks = useMemo(() => listUnplacedBooks(), [tick]);
+
+  const normalizedQuery = typeQuery.trim().toLowerCase();
+  const highlightedBookIds = useMemo(() => {
+    if (!normalizedQuery) return new Set<string>();
+    return new Set(
+      books
+        .filter((b) => {
+          const title = b.title.toLowerCase();
+          const author = b.author.toLowerCase();
+          return title.includes(normalizedQuery) || author.includes(normalizedQuery);
+        })
+        .map((b) => b.id),
+    );
+  }, [books, normalizedQuery]);
+
+  const booksForList = useMemo(() => {
+    if (!normalizedQuery) return books;
+    const matched = books.filter((b) => highlightedBookIds.has(b.id));
+    const unmatched = books.filter((b) => !highlightedBookIds.has(b.id));
+    return [...matched, ...unmatched];
+  }, [books, highlightedBookIds, normalizedQuery]);
+
+  useEffect(() => {
+    if (!showTypeQuery) return;
+    if (hideQueryTimerRef.current) {
+      window.clearTimeout(hideQueryTimerRef.current);
+    }
+    hideQueryTimerRef.current = window.setTimeout(() => {
+      setShowTypeQuery(false);
+    }, 1000);
+    return () => {
+      if (hideQueryTimerRef.current) {
+        window.clearTimeout(hideQueryTimerRef.current);
+      }
+    };
+  }, [showTypeQuery, typeQuery]);
+
+  useEffect(() => {
+    function isEditableTarget(target: EventTarget | null): boolean {
+      const el = target as HTMLElement | null;
+      if (!el) return false;
+      const tag = el.tagName?.toLowerCase();
+      return (
+        el.isContentEditable ||
+        tag === "input" ||
+        tag === "textarea" ||
+        tag === "select"
+      );
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (isEditableTarget(e.target)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      if (e.key === "Escape") {
+        setTypeQuery("");
+        setShowTypeQuery(false);
+        return;
+      }
+
+      if (e.key === "Backspace") {
+        e.preventDefault();
+        setTypeQuery((prev) => prev.slice(0, -1));
+        setShowTypeQuery(true);
+        return;
+      }
+
+      if (e.key.length === 1 && !e.repeat) {
+        e.preventDefault();
+        setTypeQuery((prev) => (prev + e.key).slice(0, 40));
+        setShowTypeQuery(true);
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const selectedBook = selectedBookId
     ? getBookById(selectedBookId)
@@ -77,6 +155,14 @@ function App() {
   }
 
   function selectBook(book: Book) {
+    if (!book.placed) {
+      setSelectedCubby(null);
+      setSelectedBookId(book.id);
+      setPanelMode("detail");
+      setStatus(null);
+      setView("books");
+      return;
+    }
     setSelectedCubby({ x: book.cubbyX, y: book.cubbyY });
     setSelectedBookId(book.id);
     setPanelMode("detail");
@@ -139,18 +225,39 @@ function App() {
     refresh();
   }
 
-  function handleSaveCubbySize(dims: CubbyDimensions) {
-    if (!selectedCubby) return;
-    setCubbyDimensions(selectedCubby.x, selectedCubby.y, dims);
-    setStatus(`Cubby (${selectedCubby.x},${selectedCubby.y}) size saved`);
+  function handleAddInventoryBook(input: {
+    title: string;
+    author: string;
+    isbn: string;
+    notes: string;
+    widthMm: number;
+    heightMm: number;
+    depthMm: number;
+  }) {
+    const created = createInventoryBook(input);
+    setSelectedBookId(created.id);
+    setStatus("Book added to inventory.");
     refresh();
   }
 
-  function handleUseDefaultCubbySize() {
-    if (!selectedCubby) return;
-    clearCubbyDimensionsOverride(selectedCubby.x, selectedCubby.y);
-    setStatus("Using shelf default cubby size");
+  function handlePlaceQueuedInSelectedCubby(orderedIds: string[]) {
+    if (!selectedCubby) return { placedCount: 0, skippedIds: [] as string[] };
+    const result = placeUnplacedBooksInCubby(
+      selectedCubby.x,
+      selectedCubby.y,
+      orderedIds,
+    );
+    if (result.placed.length > 0) {
+      setSelectedBookId(result.placed[0].id);
+    }
+    setStatus(
+      `Placed ${result.placed.length} book(s), skipped ${result.skipped.length} in cubby (${selectedCubby.x},${selectedCubby.y}).`,
+    );
     refresh();
+    return {
+      placedCount: result.placed.length,
+      skippedIds: result.skipped.map((s) => s.id),
+    };
   }
 
   function addFormInitial(): Partial<BookInput> {
@@ -205,12 +312,12 @@ function App() {
           shelf={shelf}
           cellType={selectedCellType}
           books={cubbyBooks}
+          unplacedBooks={unplacedBooks}
           selectedBookId={selectedBookId}
           onSelectBook={selectBook}
           onAddBook={startAddBook}
           onToggleCellType={handleToggleCellType}
-          onSaveCubbySize={handleSaveCubbySize}
-          onUseDefaultCubbySize={handleUseDefaultCubbySize}
+          onPlaceQueued={handlePlaceQueuedInSelectedCubby}
         />
       )}
       <ActionLog entries={log} />
@@ -218,13 +325,10 @@ function App() {
   );
 
   return (
-    <div className="app">
+    <div className={`app ${normalizedQuery ? "search-active" : ""}`}>
       <header className="app-header">
         <div>
           <h1>Library Shelf</h1>
-          <p className="subtitle">
-            5×5 cubbies · many books per cubby · mm positions · click each book
-          </p>
         </div>
         <nav className="view-nav">
           <button
@@ -255,6 +359,11 @@ function App() {
       </header>
 
       {status && <div className="status-banner">{status}</div>}
+      {showTypeQuery && typeQuery && (
+        <div className="type-search-overlay">
+          Search: <span>{typeQuery}</span>
+        </div>
+      )}
 
       <main className="app-main">
         {view === "settings" ? (
@@ -268,11 +377,12 @@ function App() {
           <div className="shelf-layout">
             <div className="shelf-frame">
               <ShelfGrid
-                books={books}
+                books={placedBooks}
                 shelf={shelf}
                 cellTypes={shelf.cellTypes}
                 selectedCubby={selectedCubby}
                 selectedBookId={selectedBookId}
+                highlightedBookIds={highlightedBookIds}
                 onSelectCubby={selectCubby}
                 onSelectBook={selectBook}
               />
@@ -282,11 +392,12 @@ function App() {
         ) : (
           <div className="books-layout">
             <BookList
-              books={filteredBooks}
-              query={searchQuery}
-              onQueryChange={setSearchQuery}
+              books={booksForList}
               selectedId={selectedBookId}
+              highlightedBookIds={highlightedBookIds}
+              typedQuery={typeQuery}
               onSelect={selectBookFromList}
+              onAddInventory={handleAddInventoryBook}
             />
             <aside className="sidebar">{sidebar}</aside>
           </div>

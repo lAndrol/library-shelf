@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import type { Book } from "../types/book";
 import type { ShelfConfig } from "../types/shelf";
 import { getCubbyDimensions } from "../utils/cubby";
-import { bookStylePercent, formatSize } from "../utils/layout";
+import { bookStylePercent } from "../utils/layout";
 
 interface CubbyViewProps {
   cubbyX: number;
@@ -12,6 +12,7 @@ interface CubbyViewProps {
   cellType: "book-slot" | "other";
   isCubbySelected: boolean;
   selectedBookId: string | null;
+  highlightedBookIds: Set<string>;
   onSelectCubby: () => void;
   onSelectBook: (book: Book) => void;
 }
@@ -24,6 +25,7 @@ export function CubbyView({
   cellType,
   isCubbySelected,
   selectedBookId,
+  highlightedBookIds,
   onSelectCubby,
   onSelectBook,
 }: CubbyViewProps) {
@@ -63,6 +65,7 @@ export function CubbyView({
             sorted.map((book) => {
               const style = bookStylePercent(book, cubbyDims);
               const isBookSelected = selectedBookId === book.id;
+              const isHighlighted = highlightedBookIds.has(book.id);
               return (
                 <button
                   key={book.id}
@@ -70,6 +73,7 @@ export function CubbyView({
                   className={[
                     "book-block",
                     isBookSelected ? "book-block-selected" : "",
+                    isHighlighted ? "book-block-highlighted" : "",
                   ]
                     .filter(Boolean)
                     .join(" ")}
@@ -80,14 +84,13 @@ export function CubbyView({
                     height: style.height,
                     zIndex: style.zIndex,
                   }}
-                  title={`${book.title} · ${formatSize(book)}`}
+                  title={book.title}
                   onClick={(e) => {
                     e.stopPropagation();
                     onSelectBook(book);
                   }}
                 >
                   <span className="book-block-title">{book.title}</span>
-                  <span className="book-block-size">{formatSize(book)}</span>
                 </button>
               );
             })

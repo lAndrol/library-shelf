@@ -23,7 +23,7 @@ type RawPersisted = {
 function migrateBook(raw: unknown): Book {
   const b = raw as Book & LegacyBookV1;
   if (typeof b.cubbyX === "number") {
-    return b as Book;
+    return { ...b, placed: b.placed ?? true } as Book;
   }
   return {
     id: b.id,
@@ -31,6 +31,7 @@ function migrateBook(raw: unknown): Book {
     author: b.author ?? "",
     isbn: b.isbn ?? "",
     notes: b.notes ?? "",
+    placed: true,
     cubbyX: b.gridX ?? 0,
     cubbyY: b.gridY ?? 0,
     posX: 0,
