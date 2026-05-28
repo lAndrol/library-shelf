@@ -1,9 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { Book } from "../types/book";
+import type { ShelfConfig } from "../types/shelf";
+import { bookTargetMm, formatPosition } from "../utils/layout";
 
 export interface PresentResult {
   message: string;
-  x: number;
-  y: number;
+  targetX: number;
+  targetY: number;
+  bookId: string;
   at: string;
 }
 
@@ -11,20 +15,29 @@ function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
-/** Mock hardware: reports that this grid coordinate was selected and pushed. */
-export async function presentBook(x: number, y: number): Promise<PresentResult> {
+export async function presentBook(
+  book: Book,
+  shelf: ShelfConfig,
+): Promise<PresentResult> {
   const at = new Date().toISOString();
-  let message: string;
+  const { x: targetX, y: targetY } = bookTargetMm(book, shelf);
+  const label = formatPosition(book);
+  const fallback = `${label} → target ${targetX.toFixed(1)}, ${targetY.toFixed(1)} mm — selected and pushed`;
 
+  let message: string;
   if (isTauri()) {
     try {
-      message = await invoke<string>("present_book", { x, y });
+      message = await invoke<string>("present_book", {
+        x: targetX,
+        y: targetY,
+        bookId: book.id,
+      });
     } catch {
-      message = `Coordinate (${x}, ${y}) selected and pushed`;
+      message = fallback;
     }
   } else {
-    message = `Coordinate (${x}, ${y}) selected and pushed`;
+    message = fallback;
   }
 
-  return { message, x, y, at };
+  return { message, targetX, targetY, bookId: book.id, at };
 }
