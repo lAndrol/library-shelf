@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from "react";
-import type { BookInput } from "../types/book";
+import { DEFAULT_BOOK_SIZE, type BookInput } from "../types/book";
+import type { ShelfConfig } from "../types/shelf";
 
 interface BookFormProps {
+  shelf: ShelfConfig;
   initial?: Partial<BookInput> & { id?: string };
   onSave: (input: BookInput) => void;
   onCancel: () => void;
@@ -10,6 +12,7 @@ interface BookFormProps {
 }
 
 export function BookForm({
+  shelf,
   initial,
   onSave,
   onCancel,
@@ -20,8 +23,20 @@ export function BookForm({
   const [author, setAuthor] = useState(initial?.author ?? "");
   const [isbn, setIsbn] = useState(initial?.isbn ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
-  const [gridX, setGridX] = useState(initial?.gridX ?? 0);
-  const [gridY, setGridY] = useState(initial?.gridY ?? 0);
+  const [cubbyX, setCubbyX] = useState(initial?.cubbyX ?? 0);
+  const [cubbyY, setCubbyY] = useState(initial?.cubbyY ?? 0);
+  const [posX, setPosX] = useState(initial?.posX ?? 0);
+  const [posY, setPosY] = useState(initial?.posY ?? 0);
+  const [posZ, setPosZ] = useState(initial?.posZ ?? 0);
+  const [widthMm, setWidthMm] = useState(
+    initial?.widthMm ?? DEFAULT_BOOK_SIZE.widthMm,
+  );
+  const [heightMm, setHeightMm] = useState(
+    initial?.heightMm ?? DEFAULT_BOOK_SIZE.heightMm,
+  );
+  const [depthMm, setDepthMm] = useState(
+    initial?.depthMm ?? DEFAULT_BOOK_SIZE.depthMm,
+  );
   const [error, setError] = useState<string | null>(null);
 
   function handleSubmit(e: FormEvent) {
@@ -37,8 +52,14 @@ export function BookForm({
         author,
         isbn,
         notes,
-        gridX,
-        gridY,
+        cubbyX,
+        cubbyY,
+        posX,
+        posY,
+        posZ,
+        widthMm,
+        heightMm,
+        depthMm,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save.");
@@ -63,31 +84,111 @@ export function BookForm({
       </label>
       <label>
         Notes
-        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
       </label>
-      <div className="coord-row">
-        <label>
-          X (col)
-          <input
-            type="number"
-            min={0}
-            max={4}
-            value={gridX}
-            onChange={(e) => setGridX(Number(e.target.value))}
-          />
-        </label>
-        <label>
-          Y (row)
-          <input
-            type="number"
-            min={0}
-            max={4}
-            value={gridY}
-            onChange={(e) => setGridY(Number(e.target.value))}
-          />
-        </label>
-      </div>
-      <p className="coord-hint">(0, 0) is top-left. Grid is 5×5.</p>
+
+      <fieldset className="form-fieldset">
+        <legend>Cubby (5×5)</legend>
+        <div className="coord-row">
+          <label>
+            Col X
+            <input
+              type="number"
+              min={0}
+              max={4}
+              value={cubbyX}
+              onChange={(e) => setCubbyX(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Row Y
+            <input
+              type="number"
+              min={0}
+              max={4}
+              value={cubbyY}
+              onChange={(e) => setCubbyY(Number(e.target.value))}
+            />
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset className="form-fieldset">
+        <legend>Position inside cubby (mm)</legend>
+        <p className="coord-hint">
+          Fine coords from top-left. Cubby: {shelf.cubbyWidthMm}×{shelf.cubbyHeightMm}×
+          {shelf.cubbyDepthMm} mm
+        </p>
+        <div className="coord-row coord-row-3">
+          <label>
+            posX
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={posX}
+              onChange={(e) => setPosX(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            posY
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={posY}
+              onChange={(e) => setPosY(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            posZ (depth)
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={posZ}
+              onChange={(e) => setPosZ(Number(e.target.value))}
+            />
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset className="form-fieldset">
+        <legend>Book size (mm)</legend>
+        <div className="coord-row coord-row-3">
+          <label>
+            Width
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={widthMm}
+              onChange={(e) => setWidthMm(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Height
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={heightMm}
+              onChange={(e) => setHeightMm(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Depth
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={depthMm}
+              onChange={(e) => setDepthMm(Number(e.target.value))}
+            />
+          </label>
+        </div>
+      </fieldset>
+
       <div className="form-actions">
         <button type="submit" className="btn primary">
           {submitLabel}

@@ -1,14 +1,12 @@
 import { loadData, saveData, type PersistedData } from "../db/storage";
 import type { Book, BookInput } from "../types/book";
-import { defaultShelfConfig, getCellType } from "./shelf";
+import { DEFAULT_BOOK_SIZE } from "../types/book";
+import { bookFitsCubby, findOverlaps } from "../utils/layout";
+import { defaultShelfConfig, getCellType, getShelfConfig } from "./shelf";
 import { GRID_COLS, GRID_ROWS, isInGrid } from "../types/shelf";
 
 function read(): PersistedData {
-  const data = loadData();
-  if (!data) {
-    return { version: 1, books: [], shelf: defaultShelfConfig() };
-  }
-  return data;
+  return loadData() ?? { version: 2, books: [], shelf: defaultShelfConfig() };
 }
 
 function write(data: PersistedData): void {
@@ -19,12 +17,40 @@ function now(): string {
   return new Date().toISOString();
 }
 
+function validateBook(input: BookInput, excludeId?: string): void {
+  const shelf = getShelfConfig();
+  if (!isInGrid(input.cubbyX, input.cubbyY, GRID_COLS, GRID_ROWS)) {
+    throw new Error("Cubby is outside the 5×5 grid.");
+  }
+  if (getCellType(input.cubbyX, input.cubbyY) !== "book-slot") {
+    throw new Error("This cubby is not a book slot.");
+  }
+  if (input.widthMm <= 0 || input.heightMm <= 0 || input.depthMm <= 0) {
+    throw new Error("Book dimensions must be greater than 0 mm.");
+  }
+  const draft = { ...input, id: excludeId ?? "__draft__" } as Book;
+  if (!bookFitsCubby(draft, shelf)) {
+    throw new Error(
+      `Book does not fit inside cubby (${shelf.cubbyWidthMm}×${shelf.cubbyHeightMm}×${shelf.cubbyDepthMm} mm).`,
+    );
+  }
+  const inCubby = getBooksInCubby(input.cubbyX, input.cubbyY).filter(
+    (b) => b.id !== excludeId,
+  );
+  const overlaps = findOverlaps(draft, inCubby);
+  if (overlaps.length > 0) {
+    throw new Error(
+      `Footprint overlaps: ${overlaps.map((b) => b.title).join(", ")}`,
+    );
+  }
+}
+
 export function listBooks(): Book[] {
   return read().books;
 }
 
-export function getBookAt(x: number, y: number): Book | undefined {
-  return read().books.find((b) => b.gridX === x && b.gridY === y);
+export function getBooksInCubby(cubbyX: number, cubbyY: number): Book[] {
+  return read().books.filter((b) => b.cubbyX === cubbyX && b.cubbyY === cubbyY);
 }
 
 export function getBookById(id: string): Book | undefined {
@@ -32,15 +58,8 @@ export function getBookById(id: string): Book | undefined {
 }
 
 export function createBook(input: BookInput): Book {
-  if (!isInGrid(input.gridX, input.gridY, GRID_COLS, GRID_ROWS)) {
-    throw new Error("Position is outside the shelf grid.");
-  }
-  if (getCellType(input.gridX, input.gridY) !== "book-slot") {
-    throw new Error("This cell is not a book slot.");
-  }
-  if (getBookAt(input.gridX, input.gridY)) {
-    throw new Error("Another book is already in this cell.");
-  }
+  if (!input.title.trim()) throw new Error("Title is required.");
+  validateBook(input);
 
   const book: Book = {
     id: crypto.randomUUID(),
@@ -48,8 +67,14 @@ export function createBook(input: BookInput): Book {
     author: input.author.trim(),
     isbn: input.isbn.trim(),
     notes: input.notes.trim(),
-    gridX: input.gridX,
-    gridY: input.gridY,
+    cubbyX: input.cubbyX,
+    cubbyY: input.cubbyY,
+    posX: input.posX,
+    posY: input.posY,
+    posZ: input.posZ,
+    widthMm: input.widthMm,
+    heightMm: input.heightMm,
+    depthMm: input.depthMm,
     createdAt: now(),
     updatedAt: now(),
   };
@@ -66,33 +91,25 @@ export function updateBook(id: string, input: Partial<BookInput>): Book {
   if (index === -1) throw new Error("Book not found.");
 
   const existing = data.books[index];
-  const gridX = input.gridX ?? existing.gridX;
-  const gridY = input.gridY ?? existing.gridY;
-
-  if (!isInGrid(gridX, gridY, GRID_COLS, GRID_ROWS)) {
-    throw new Error("Position is outside the shelf grid.");
-  }
-  if (getCellType(gridX, gridY) !== "book-slot") {
-    throw new Error("This cell is not a book slot.");
-  }
-  const occupant = data.books.find(
-    (b) => b.gridX === gridX && b.gridY === gridY && b.id !== id,
-  );
-  if (occupant) throw new Error("Another book is already in this cell.");
-
-  const updated: Book = {
-    ...existing,
-    title: input.title !== undefined ? input.title.trim() : existing.title,
-    author: input.author !== undefined ? input.author.trim() : existing.author,
-    isbn: input.isbn !== undefined ? input.isbn.trim() : existing.isbn,
-    notes: input.notes !== undefined ? input.notes.trim() : existing.notes,
-    gridX,
-    gridY,
-    updatedAt: now(),
+  const merged: BookInput = {
+    title: input.title ?? existing.title,
+    author: input.author ?? existing.author,
+    isbn: input.isbn ?? existing.isbn,
+    notes: input.notes ?? existing.notes,
+    cubbyX: input.cubbyX ?? existing.cubbyX,
+    cubbyY: input.cubbyY ?? existing.cubbyY,
+    posX: input.posX ?? existing.posX,
+    posY: input.posY ?? existing.posY,
+    posZ: input.posZ ?? existing.posZ,
+    widthMm: input.widthMm ?? existing.widthMm,
+    heightMm: input.heightMm ?? existing.heightMm,
+    depthMm: input.depthMm ?? existing.depthMm,
   };
 
-  if (!updated.title) throw new Error("Title is required.");
+  if (!merged.title.trim()) throw new Error("Title is required.");
+  validateBook(merged, id);
 
+  const updated: Book = { ...existing, ...merged, updatedAt: now() };
   data.books[index] = updated;
   write(data);
   return updated;
@@ -113,4 +130,23 @@ export function searchBooks(query: string): Book[] {
       b.author.toLowerCase().includes(q) ||
       b.isbn.toLowerCase().includes(q),
   );
+}
+
+/** Suggest next free-ish position in cubby (simple stack to the right). */
+export function suggestPosition(cubbyX: number, cubbyY: number): {
+  posX: number;
+  posY: number;
+  posZ: number;
+} {
+  const shelf = getShelfConfig();
+  const existing = getBooksInCubby(cubbyX, cubbyY);
+  if (existing.length === 0) return { posX: 0, posY: 0, posZ: 0 };
+
+  let maxRight = 0;
+  for (const b of existing) {
+    maxRight = Math.max(maxRight, b.posX + b.widthMm);
+  }
+  const gap = 4;
+  const posX = Math.min(maxRight + gap, shelf.cubbyWidthMm - DEFAULT_BOOK_SIZE.widthMm);
+  return { posX: Math.max(0, posX), posY: 0, posZ: 0 };
 }

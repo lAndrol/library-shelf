@@ -1,31 +1,39 @@
 import { useCallback, useMemo, useState } from "react";
 import "./App.css";
 import { ActionLog } from "./components/ActionLog";
+import { BookDetail } from "./components/BookDetail";
 import { BookForm } from "./components/BookForm";
 import { BookList } from "./components/BookList";
-import { CellDetail } from "./components/CellDetail";
+import { CubbyPanel } from "./components/CubbyPanel";
 import { ShelfGrid } from "./components/ShelfGrid";
 import {
   createBook,
   deleteBook,
-  getBookAt,
+  getBookById,
+  getBooksInCubby,
   listBooks,
   searchBooks,
+  suggestPosition,
   updateBook,
 } from "./services/books";
 import { presentBook, type PresentResult } from "./services/hardware";
 import { cycleCellType, getCellType, getShelfConfig } from "./services/shelf";
 import type { Book, BookInput } from "./types/book";
+import { DEFAULT_BOOK_SIZE } from "./types/book";
 
 type View = "shelf" | "books";
-type PanelMode = "detail" | "add" | "edit" | null;
+type PanelMode = "detail" | "add" | "edit";
 
 function App() {
   const [view, setView] = useState<View>("shelf");
   const [tick, setTick] = useState(0);
   const refresh = useCallback(() => setTick((t) => t + 1), []);
 
-  const [selected, setSelected] = useState<{ x: number; y: number } | null>(null);
+  const [selectedCubby, setSelectedCubby] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
   const [panelMode, setPanelMode] = useState<PanelMode>("detail");
   const [searchQuery, setSearchQuery] = useState("");
   const [log, setLog] = useState<PresentResult[]>([]);
@@ -39,28 +47,49 @@ function App() {
     [tick, searchQuery],
   );
 
-  const selectedBook =
-    selected !== null ? getBookAt(selected.x, selected.y) : undefined;
+  const selectedBook = selectedBookId
+    ? getBookById(selectedBookId)
+    : undefined;
+  const cubbyBooks =
+    selectedCubby !== null
+      ? getBooksInCubby(selectedCubby.x, selectedCubby.y)
+      : [];
   const selectedCellType =
-    selected !== null ? getCellType(selected.x, selected.y) : "book-slot";
+    selectedCubby !== null
+      ? getCellType(selectedCubby.x, selectedCubby.y)
+      : "book-slot";
 
-  function selectCell(x: number, y: number) {
-    setSelected({ x, y });
+  function selectCubby(x: number, y: number) {
+    setSelectedCubby({ x, y });
+    setSelectedBookId(null);
+    setPanelMode("detail");
+    setStatus(null);
+    setView("shelf");
+  }
+
+  function selectBook(book: Book) {
+    setSelectedCubby({ x: book.cubbyX, y: book.cubbyY });
+    setSelectedBookId(book.id);
     setPanelMode("detail");
     setStatus(null);
     setView("shelf");
   }
 
   function selectBookFromList(book: Book) {
-    selectCell(book.gridX, book.gridY);
+    selectBook(book);
+  }
+
+  function startAddBook() {
+    if (!selectedCubby) return;
+    setPanelMode("add");
   }
 
   async function handlePresent() {
-    if (!selected) return;
+    if (!selectedBook) return;
     setPresenting(true);
     setStatus(null);
     try {
-      const result = await presentBook(selected.x, selected.y);
+      const result = await presentBook(selectedBook, shelf);
       setLog((prev) => [result, ...prev].slice(0, 50));
       setStatus(result.message);
     } finally {
@@ -71,9 +100,11 @@ function App() {
   function handleSaveBook(input: BookInput) {
     if (panelMode === "edit" && selectedBook) {
       updateBook(selectedBook.id, input);
+      setSelectedBookId(selectedBook.id);
     } else {
-      createBook(input);
-      setSelected({ x: input.gridX, y: input.gridY });
+      const created = createBook(input);
+      setSelectedBookId(created.id);
+      setSelectedCubby({ x: created.cubbyX, y: created.cubbyY });
     }
     setPanelMode("detail");
     refresh();
@@ -82,22 +113,86 @@ function App() {
   function handleDeleteBook() {
     if (!selectedBook) return;
     deleteBook(selectedBook.id);
+    setSelectedBookId(null);
     setPanelMode("detail");
     refresh();
   }
 
   function handleToggleCellType() {
-    if (!selected) return;
-    cycleCellType(selected.x, selected.y);
+    if (!selectedCubby) return;
+    cycleCellType(selectedCubby.x, selectedCubby.y);
     refresh();
   }
+
+  function addFormInitial(): Partial<BookInput> {
+    if (!selectedCubby) {
+      return { ...DEFAULT_BOOK_SIZE };
+    }
+    const pos = suggestPosition(selectedCubby.x, selectedCubby.y);
+    return {
+      cubbyX: selectedCubby.x,
+      cubbyY: selectedCubby.y,
+      ...pos,
+      ...DEFAULT_BOOK_SIZE,
+    };
+  }
+
+  const sidebar = (
+    <>
+      {selectedCubby === null ? (
+        <section className="panel cell-detail">
+          <h2>Select a cubby or book</h2>
+          <p className="muted">
+            Click a cubby background, or click a book block to select it precisely.
+          </p>
+        </section>
+      ) : panelMode === "add" ? (
+        <BookForm
+          shelf={shelf}
+          initial={addFormInitial()}
+          onSave={handleSaveBook}
+          onCancel={() => setPanelMode("detail")}
+        />
+      ) : panelMode === "edit" && selectedBook ? (
+        <BookForm
+          shelf={shelf}
+          initial={{ ...selectedBook, id: selectedBook.id }}
+          onSave={handleSaveBook}
+          onCancel={() => setPanelMode("detail")}
+          onDelete={handleDeleteBook}
+        />
+      ) : selectedBook ? (
+        <BookDetail
+          book={selectedBook}
+          shelf={shelf}
+          onPresent={handlePresent}
+          onEdit={() => setPanelMode("edit")}
+          presenting={presenting}
+        />
+      ) : (
+        <CubbyPanel
+          cubbyX={selectedCubby.x}
+          cubbyY={selectedCubby.y}
+          cellType={selectedCellType}
+          books={cubbyBooks}
+          selectedBookId={selectedBookId}
+          onSelectBook={selectBook}
+          onAddBook={startAddBook}
+          onToggleCellType={handleToggleCellType}
+        />
+      )}
+      <ActionLog entries={log} />
+    </>
+  );
 
   return (
     <div className="app">
       <header className="app-header">
         <div>
           <h1>Library Shelf</h1>
-          <p className="subtitle">5×5 grid · (0,0) top-left · hardware mock</p>
+          <p className="subtitle">
+            5×5 cubbies · many books per cubby · mm positions · click each book
+          </p>
         </div>
         <nav className="view-nav">
           <button
@@ -125,43 +220,15 @@ function App() {
             <div className="shelf-frame">
               <ShelfGrid
                 books={books}
+                shelf={shelf}
                 cellTypes={shelf.cellTypes}
-                selected={selected}
-                onSelectCell={selectCell}
+                selectedCubby={selectedCubby}
+                selectedBookId={selectedBookId}
+                onSelectCubby={selectCubby}
+                onSelectBook={selectBook}
               />
             </div>
-            <aside className="sidebar">
-              {selected === null ? (
-                <section className="panel cell-detail">
-                  <h2>Select a cell</h2>
-                  <p className="muted">Click a square on the shelf to view or add a book.</p>
-                </section>
-              ) : panelMode === "add" || panelMode === "edit" ? (
-                <BookForm
-                  initial={
-                    panelMode === "edit" && selectedBook
-                      ? { ...selectedBook, id: selectedBook.id }
-                      : { gridX: selected.x, gridY: selected.y }
-                  }
-                  onSave={handleSaveBook}
-                  onCancel={() => setPanelMode("detail")}
-                  onDelete={panelMode === "edit" ? handleDeleteBook : undefined}
-                />
-              ) : (
-                <CellDetail
-                  x={selected.x}
-                  y={selected.y}
-                  cellType={selectedCellType}
-                  book={selectedBook}
-                  onPresent={handlePresent}
-                  onAdd={() => setPanelMode("add")}
-                  onEdit={() => setPanelMode("edit")}
-                  onToggleCellType={handleToggleCellType}
-                  presenting={presenting}
-                />
-              )}
-              <ActionLog entries={log} />
-            </aside>
+            <aside className="sidebar">{sidebar}</aside>
           </div>
         ) : (
           <div className="books-layout">
@@ -169,22 +236,10 @@ function App() {
               books={filteredBooks}
               query={searchQuery}
               onQueryChange={setSearchQuery}
-              selectedId={selectedBook?.id ?? null}
+              selectedId={selectedBookId}
               onSelect={selectBookFromList}
             />
-            {selected !== null && selectedBook && panelMode === "detail" && (
-              <CellDetail
-                x={selected.x}
-                y={selected.y}
-                cellType={selectedCellType}
-                book={selectedBook}
-                onPresent={handlePresent}
-                onAdd={() => setPanelMode("add")}
-                onEdit={() => setPanelMode("edit")}
-                onToggleCellType={handleToggleCellType}
-                presenting={presenting}
-              />
-            )}
+            <aside className="sidebar">{sidebar}</aside>
           </div>
         )}
       </main>

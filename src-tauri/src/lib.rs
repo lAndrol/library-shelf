@@ -1,6 +1,8 @@
 #[tauri::command]
-fn present_book(x: u32, y: u32) -> String {
-    format!("Coordinate ({x}, {y}) selected and pushed")
+fn present_book(x: f64, y: f64, book_id: String) -> String {
+    format!(
+        "Book {book_id} → {x:.1}, {y:.1} mm on shelf plane — selected and pushed"
+    )
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

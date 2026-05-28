@@ -1,19 +1,26 @@
 import type { Book } from "../types/book";
-import type { CellType } from "../types/shelf";
+import type { CellType, ShelfConfig } from "../types/shelf";
 import { GRID_COLS, GRID_ROWS } from "../types/shelf";
+import { CubbyView } from "./CubbyView";
 
 interface ShelfGridProps {
   books: Book[];
+  shelf: ShelfConfig;
   cellTypes: Record<string, CellType>;
-  selected: { x: number; y: number } | null;
-  onSelectCell: (x: number, y: number) => void;
+  selectedCubby: { x: number; y: number } | null;
+  selectedBookId: string | null;
+  onSelectCubby: (x: number, y: number) => void;
+  onSelectBook: (book: Book) => void;
 }
 
 export function ShelfGrid({
   books,
+  shelf,
   cellTypes,
-  selected,
-  onSelectCell,
+  selectedCubby,
+  selectedBookId,
+  onSelectCubby,
+  onSelectBook,
 }: ShelfGridProps) {
   const cells: { x: number; y: number }[] = [];
   for (let y = 0; y < GRID_ROWS; y++) {
@@ -33,35 +40,23 @@ export function ShelfGrid({
       {cells.map(({ x, y }) => {
         const key = `${x},${y}`;
         const type = cellTypes[key] ?? "book-slot";
-        const book = books.find((b) => b.gridX === x && b.gridY === y);
-        const isSelected = selected?.x === x && selected?.y === y;
+        const cubbyBooks = books.filter((b) => b.cubbyX === x && b.cubbyY === y);
+        const isCubbySelected =
+          selectedCubby?.x === x && selectedCubby?.y === y;
 
         return (
-          <button
+          <CubbyView
             key={key}
-            type="button"
-            className={[
-              "shelf-cell",
-              type === "other" ? "cell-other" : "cell-slot",
-              book ? "cell-occupied" : "cell-empty",
-              isSelected ? "cell-selected" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            onClick={() => onSelectCell(x, y)}
-            title={`(${x}, ${y})`}
-          >
-            <span className="cell-coord">
-              {x},{y}
-            </span>
-            {type === "other" ? (
-              <span className="cell-label">Other</span>
-            ) : book ? (
-              <span className="cell-title">{book.title}</span>
-            ) : (
-              <span className="cell-label muted">Empty</span>
-            )}
-          </button>
+            cubbyX={x}
+            cubbyY={y}
+            books={cubbyBooks}
+            shelf={shelf}
+            cellType={type}
+            isCubbySelected={isCubbySelected}
+            selectedBookId={selectedBookId}
+            onSelectCubby={() => onSelectCubby(x, y)}
+            onSelectBook={onSelectBook}
+          />
         );
       })}
     </div>

@@ -1,30 +1,17 @@
 import { loadData, saveData, type PersistedData } from "../db/storage";
 import {
   cellKey,
-  GRID_COLS,
-  GRID_ROWS,
+  createDefaultShelfConfig,
   type CellType,
   type ShelfConfig,
 } from "../types/shelf";
 
-export function defaultShelfConfig(): ShelfConfig {
-  const cellTypes: Record<string, CellType> = {};
-  for (let y = 0; y < GRID_ROWS; y++) {
-    for (let x = 0; x < GRID_COLS; x++) {
-      cellTypes[cellKey(x, y)] = "book-slot";
-    }
-  }
-  return { cols: GRID_COLS, rows: GRID_ROWS, cellTypes };
+export function defaultShelfConfig() {
+  return createDefaultShelfConfig();
 }
 
 function read(): PersistedData {
-  return (
-    loadData() ?? {
-      version: 1,
-      books: [],
-      shelf: defaultShelfConfig(),
-    }
-  );
+  return loadData() ?? { version: 2, books: [], shelf: defaultShelfConfig() };
 }
 
 function write(data: PersistedData): void {

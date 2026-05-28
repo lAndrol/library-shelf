@@ -1,4 +1,5 @@
 import type { Book } from "../types/book";
+import { formatPosition, formatSize } from "../utils/layout";
 
 interface BookListProps {
   books: Book[];
@@ -38,7 +39,7 @@ export function BookList({
                 <span className="book-list-title">{b.title}</span>
                 {b.author && <span className="book-list-author">{b.author}</span>}
                 <span className="book-list-coord">
-                  ({b.gridX}, {b.gridY})
+                  {formatPosition(b)} · {formatSize(b)}
                 </span>
               </button>
             </li>
