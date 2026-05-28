@@ -1,10 +1,7 @@
 import type { Book } from "../types/book";
 import type { ShelfConfig } from "../types/shelf";
-import {
-  bookTargetMm,
-  formatPosition,
-  formatSize,
-} from "../utils/layout";
+import { formatCubbyDimensions, getCubbyDimensions } from "../utils/cubby";
+import { bookTargetMm, formatPosition, formatSize } from "../utils/layout";
 
 interface BookDetailProps {
   book: Book;
@@ -22,6 +19,7 @@ export function BookDetail({
   presenting,
 }: BookDetailProps) {
   const target = bookTargetMm(book, shelf);
+  const cubby = getCubbyDimensions(shelf, book.cubbyX, book.cubbyY);
 
   return (
     <section className="panel book-detail">
@@ -31,7 +29,9 @@ export function BookDetail({
       <dl className="meta-list">
         <dt>Position</dt>
         <dd>{formatPosition(book)}</dd>
-        <dt>Size</dt>
+        <dt>Cubby size</dt>
+        <dd>{formatCubbyDimensions(cubby)}</dd>
+        <dt>Book size</dt>
         <dd>{formatSize(book)}</dd>
         <dt>Gantry target (center)</dt>
         <dd>

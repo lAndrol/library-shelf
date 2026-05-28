@@ -5,6 +5,7 @@ import { BookDetail } from "./components/BookDetail";
 import { BookForm } from "./components/BookForm";
 import { BookList } from "./components/BookList";
 import { CubbyPanel } from "./components/CubbyPanel";
+import { SettingsPanel } from "./components/SettingsPanel";
 import { ShelfGrid } from "./components/ShelfGrid";
 import {
   createBook,
@@ -17,11 +18,19 @@ import {
   updateBook,
 } from "./services/books";
 import { presentBook, type PresentResult } from "./services/hardware";
-import { cycleCellType, getCellType, getShelfConfig } from "./services/shelf";
+import {
+  clearCubbyDimensionsOverride,
+  cycleCellType,
+  getCellType,
+  getShelfConfig,
+  setCubbyDimensions,
+  setDefaultCubbyDimensions,
+} from "./services/shelf";
+import type { CubbyDimensions } from "./types/shelf";
 import type { Book, BookInput } from "./types/book";
 import { DEFAULT_BOOK_SIZE } from "./types/book";
 
-type View = "shelf" | "books";
+type View = "shelf" | "books" | "settings";
 type PanelMode = "detail" | "add" | "edit";
 
 function App() {
@@ -124,6 +133,26 @@ function App() {
     refresh();
   }
 
+  function handleSaveDefaultCubby(dims: CubbyDimensions) {
+    setDefaultCubbyDimensions(dims);
+    setStatus(`Default cubby size set to ${dims.widthMm}×${dims.heightMm}×${dims.depthMm} mm`);
+    refresh();
+  }
+
+  function handleSaveCubbySize(dims: CubbyDimensions) {
+    if (!selectedCubby) return;
+    setCubbyDimensions(selectedCubby.x, selectedCubby.y, dims);
+    setStatus(`Cubby (${selectedCubby.x},${selectedCubby.y}) size saved`);
+    refresh();
+  }
+
+  function handleUseDefaultCubbySize() {
+    if (!selectedCubby) return;
+    clearCubbyDimensionsOverride(selectedCubby.x, selectedCubby.y);
+    setStatus("Using shelf default cubby size");
+    refresh();
+  }
+
   function addFormInitial(): Partial<BookInput> {
     if (!selectedCubby) {
       return { ...DEFAULT_BOOK_SIZE };
@@ -173,12 +202,15 @@ function App() {
         <CubbyPanel
           cubbyX={selectedCubby.x}
           cubbyY={selectedCubby.y}
+          shelf={shelf}
           cellType={selectedCellType}
           books={cubbyBooks}
           selectedBookId={selectedBookId}
           onSelectBook={selectBook}
           onAddBook={startAddBook}
           onToggleCellType={handleToggleCellType}
+          onSaveCubbySize={handleSaveCubbySize}
+          onUseDefaultCubbySize={handleUseDefaultCubbySize}
         />
       )}
       <ActionLog entries={log} />
@@ -209,13 +241,30 @@ function App() {
           >
             Books
           </button>
+          <button
+            type="button"
+            className={view === "settings" ? "active" : ""}
+            onClick={() => {
+              setView("settings");
+              setStatus(null);
+            }}
+          >
+            Settings
+          </button>
         </nav>
       </header>
 
       {status && <div className="status-banner">{status}</div>}
 
       <main className="app-main">
-        {view === "shelf" ? (
+        {view === "settings" ? (
+          <div className="settings-layout">
+            <SettingsPanel shelf={shelf} onSaveDefault={handleSaveDefaultCubby} />
+            <aside className="sidebar">
+              <ActionLog entries={log} />
+            </aside>
+          </div>
+        ) : view === "shelf" ? (
           <div className="shelf-layout">
             <div className="shelf-frame">
               <ShelfGrid

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { DEFAULT_BOOK_SIZE, type BookInput } from "../types/book";
 import type { ShelfConfig } from "../types/shelf";
+import { formatCubbyDimensions, getCubbyDimensions } from "../utils/cubby";
 
 interface BookFormProps {
   shelf: ShelfConfig;
@@ -38,6 +39,8 @@ export function BookForm({
     initial?.depthMm ?? DEFAULT_BOOK_SIZE.depthMm,
   );
   const [error, setError] = useState<string | null>(null);
+
+  const cubbyDims = getCubbyDimensions(shelf, cubbyX, cubbyY);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -116,8 +119,7 @@ export function BookForm({
       <fieldset className="form-fieldset">
         <legend>Position inside cubby (mm)</legend>
         <p className="coord-hint">
-          Fine coords from top-left. Cubby: {shelf.cubbyWidthMm}×{shelf.cubbyHeightMm}×
-          {shelf.cubbyDepthMm} mm
+          Fine coords from top-left. This cubby: {formatCubbyDimensions(cubbyDims)}
         </p>
         <div className="coord-row coord-row-3">
           <label>

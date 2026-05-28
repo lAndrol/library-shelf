@@ -1,5 +1,6 @@
 import type { Book } from "../types/book";
-import type { ShelfConfig } from "../types/shelf";
+import type { CubbyDimensions, ShelfConfig } from "../types/shelf";
+import { cubbyOriginMm, getCubbyDimensions } from "./cubby";
 
 export interface RectMm {
   x: number;
@@ -27,38 +28,46 @@ export function findOverlaps(book: Book, others: Book[]): Book[] {
 }
 
 export function bookFitsCubby(book: Book, shelf: ShelfConfig): boolean {
+  const cubby = getCubbyDimensions(shelf, book.cubbyX, book.cubbyY);
+  return bookFitsCubbyDims(book, cubby);
+}
+
+export function bookFitsCubbyDims(book: Book, cubby: CubbyDimensions): boolean {
   return (
     book.posX >= 0 &&
     book.posY >= 0 &&
-    book.posX + book.widthMm <= shelf.cubbyWidthMm &&
-    book.posY + book.heightMm <= shelf.cubbyHeightMm &&
+    book.posX + book.widthMm <= cubby.widthMm &&
+    book.posY + book.heightMm <= cubby.heightMm &&
     book.posZ >= 0 &&
-    book.posZ + book.depthMm <= shelf.cubbyDepthMm
+    book.posZ + book.depthMm <= cubby.depthMm
   );
 }
 
 /** Global target on the XY plane behind the shelf (mm), book center. */
 export function bookTargetMm(book: Book, shelf: ShelfConfig): { x: number; y: number } {
+  const origin = cubbyOriginMm(shelf, book.cubbyX, book.cubbyY);
   return {
-    x: book.cubbyX * shelf.cubbyWidthMm + book.posX + book.widthMm / 2,
-    y: book.cubbyY * shelf.cubbyHeightMm + book.posY + book.heightMm / 2,
+    x: origin.x + book.posX + book.widthMm / 2,
+    y: origin.y + book.posY + book.heightMm / 2,
   };
 }
 
 /** CSS % for rendering a book inside a cubby (front view). */
-export function bookStylePercent(book: Book, shelf: ShelfConfig): {
+export function bookStylePercent(
+  book: Book,
+  cubby: CubbyDimensions,
+): {
   left: string;
   top: string;
   width: string;
   height: string;
   zIndex: number;
 } {
-  const { cubbyWidthMm, cubbyHeightMm } = shelf;
   return {
-    left: `${(book.posX / cubbyWidthMm) * 100}%`,
-    top: `${(book.posY / cubbyHeightMm) * 100}%`,
-    width: `${(book.widthMm / cubbyWidthMm) * 100}%`,
-    height: `${(book.heightMm / cubbyHeightMm) * 100}%`,
+    left: `${(book.posX / cubby.widthMm) * 100}%`,
+    top: `${(book.posY / cubby.heightMm) * 100}%`,
+    width: `${(book.widthMm / cubby.widthMm) * 100}%`,
+    height: `${(book.heightMm / cubby.heightMm) * 100}%`,
     zIndex: 10 + Math.round(book.posZ),
   };
 }

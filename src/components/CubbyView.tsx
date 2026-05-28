@@ -1,5 +1,7 @@
+import type { CSSProperties } from "react";
 import type { Book } from "../types/book";
 import type { ShelfConfig } from "../types/shelf";
+import { getCubbyDimensions } from "../utils/cubby";
 import { bookStylePercent, formatSize } from "../utils/layout";
 
 interface CubbyViewProps {
@@ -26,6 +28,7 @@ export function CubbyView({
   onSelectBook,
 }: CubbyViewProps) {
   const sorted = [...books].sort((a, b) => b.posZ - a.posZ);
+  const cubbyDims = getCubbyDimensions(shelf, cubbyX, cubbyY);
 
   return (
     <div
@@ -40,7 +43,12 @@ export function CubbyView({
       onKeyDown={(e) => e.key === "Enter" && onSelectCubby()}
       role="button"
       tabIndex={0}
-      title={`Cubby ${cubbyX},${cubbyY}`}
+      title={`Cubby ${cubbyX},${cubbyY} · ${cubbyDims.widthMm}×${cubbyDims.heightMm} mm`}
+      style={
+        {
+          "--cubby-aspect": `${cubbyDims.widthMm} / ${cubbyDims.heightMm}`,
+        } as CSSProperties
+      }
     >
       <span className="cubby-coord">
         {cubbyX},{cubbyY}
@@ -53,7 +61,7 @@ export function CubbyView({
             <span className="cubby-empty">Empty</span>
           ) : (
             sorted.map((book) => {
-              const style = bookStylePercent(book, shelf);
+              const style = bookStylePercent(book, cubbyDims);
               const isBookSelected = selectedBookId === book.id;
               return (
                 <button

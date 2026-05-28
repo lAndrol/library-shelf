@@ -1,7 +1,8 @@
 import { loadData, saveData, type PersistedData } from "../db/storage";
 import type { Book, BookInput } from "../types/book";
 import { DEFAULT_BOOK_SIZE } from "../types/book";
-import { bookFitsCubby, findOverlaps } from "../utils/layout";
+import { formatCubbyDimensions, getCubbyDimensions } from "../utils/cubby";
+import { bookFitsCubbyDims, findOverlaps } from "../utils/layout";
 import { defaultShelfConfig, getCellType, getShelfConfig } from "./shelf";
 import { GRID_COLS, GRID_ROWS, isInGrid } from "../types/shelf";
 
@@ -29,10 +30,9 @@ function validateBook(input: BookInput, excludeId?: string): void {
     throw new Error("Book dimensions must be greater than 0 mm.");
   }
   const draft = { ...input, id: excludeId ?? "__draft__" } as Book;
-  if (!bookFitsCubby(draft, shelf)) {
-    throw new Error(
-      `Book does not fit inside cubby (${shelf.cubbyWidthMm}×${shelf.cubbyHeightMm}×${shelf.cubbyDepthMm} mm).`,
-    );
+  const cubby = getCubbyDimensions(shelf, input.cubbyX, input.cubbyY);
+  if (!bookFitsCubbyDims(draft, cubby)) {
+    throw new Error(`Book does not fit inside cubby (${formatCubbyDimensions(cubby)}).`);
   }
   const inCubby = getBooksInCubby(input.cubbyX, input.cubbyY).filter(
     (b) => b.id !== excludeId,
@@ -147,6 +147,7 @@ export function suggestPosition(cubbyX: number, cubbyY: number): {
     maxRight = Math.max(maxRight, b.posX + b.widthMm);
   }
   const gap = 4;
-  const posX = Math.min(maxRight + gap, shelf.cubbyWidthMm - DEFAULT_BOOK_SIZE.widthMm);
+  const cubby = getCubbyDimensions(shelf, cubbyX, cubbyY);
+  const posX = Math.min(maxRight + gap, cubby.widthMm - DEFAULT_BOOK_SIZE.widthMm);
   return { posX: Math.max(0, posX), posY: 0, posZ: 0 };
 }

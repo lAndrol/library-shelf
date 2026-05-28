@@ -56,6 +56,7 @@ function normalize(raw: RawPersisted | null): PersistedData {
     cubbyWidthMm: raw.shelf?.cubbyWidthMm ?? DEFAULT_CUBBY.widthMm,
     cubbyHeightMm: raw.shelf?.cubbyHeightMm ?? DEFAULT_CUBBY.heightMm,
     cubbyDepthMm: raw.shelf?.cubbyDepthMm ?? DEFAULT_CUBBY.depthMm,
+    cubbyOverrides: raw.shelf?.cubbyOverrides ?? {},
   };
   const books = (raw.books ?? []).map(migrateBook);
   return { version: 2, books, shelf };

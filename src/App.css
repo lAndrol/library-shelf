@@ -178,10 +178,12 @@ body {
   position: relative;
   flex: 1;
   width: 100%;
-  min-height: 72px;
+  min-height: 48px;
   margin-top: 12px;
   background: rgba(0, 0, 0, 0.2);
   border-radius: 2px;
+  aspect-ratio: var(--cubby-aspect, 1);
+  max-height: 100%;
 }
 
 .book-block {
@@ -288,6 +290,30 @@ body {
   display: block;
   font-size: 0.7rem;
   color: var(--muted);
+}
+
+.cubby-size-form h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--accent-dim);
+}
+
+.cubby-size-status {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0 0 0.5rem;
+}
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: 1fr minmax(260px, 320px);
+  gap: 1.25rem;
+  align-items: start;
+  max-width: 720px;
+}
+
+.settings-panel .cubby-size-form {
+  margin-top: 1rem;
 }
 
 .muted {
@@ -510,7 +536,8 @@ body {
 
 @media (max-width: 800px) {
   .shelf-layout,
-  .books-layout {
+  .books-layout,
+  .settings-layout {
     grid-template-columns: 1fr;
   }
 
